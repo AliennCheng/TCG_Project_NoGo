@@ -6,6 +6,7 @@
 #define NOGO_BOARD_H
 #include "bitboard.h"
 #include <map>
+#include <random>
 #define BLACK 0
 #define WHITE 1
 using namespace std;
@@ -16,26 +17,29 @@ public:
     bitboard ban[2];
     //bitboard liberty[BOARDSIZE];
     map<int, bitboard*> libertyMap;
+    default_random_engine rng;
 
-    void deleteBoard();
-    void add(int where, bool who);
-    void combineLiberty (int A, int B, bool who);
-    void removeLiberty(int where, int removal, bool who);
-    void removeLiberty(int where, int removal);
-    void banSuicide(int where);
-    bool whoseTurn();
-    bool checkLegal(int where, bool who);
-    vector<int> getBlock(int value);
-    void showboard();
-    bool isEmpty();
-    int genStupidMove(int who);
-    void clear();
+//    void deleteBoard();
+//    void add(int where, bool who);
+//    void combineLiberty (int A, int B, bool who);
+//    void removeLiberty(int where, int removal, bool who);
+//    void removeLiberty(int where, int removal);
+//    void banSuicide(int where);
+//    bool whoseTurn();
+//    bool checkLegal(int where, bool who);
+//    vector<int> getBlock(int value);
+//    void showboard();
+//    bool isEmpty();
+//    int genStupidMove(int who);
+//    int genRandomMove(int who);
+//    void clear();
 
     board() {
         for (int i = 0; i < BOARDSIZE; i++) {
             //liberty[i].initLiberty(i);
             bitboard *tmp = new bitboard(i);
             libertyMap.insert(pair<int, bitboard*>(i, tmp));
+            rng = default_random_engine {};
         }
     }
 
@@ -47,8 +51,8 @@ public:
     }
 
     void add(int where, bool who) {
-        ban[0].addB(where);
-        ban[1].addB(where);
+        ban[BLACK].addB(where);
+        ban[WHITE].addB(where);
         bboard[who].addB(where);
 
         // update liberty
@@ -192,9 +196,9 @@ public:
     }
 
     bool checkLegal(int where, bool who) {
-        if (bboard[BLACK].get(where) == 1) return false;
-        if (bboard[WHITE].get(where) == 1) return false;
-        if (ban[who].get(where) == 1) return false;
+        // if (bboard[BLACK].get(where) == 1) return false;
+        // if (bboard[WHITE].get(where) == 1) return false;
+        if (ban[who].get(where)) return false;
         return true;
     }
 
@@ -253,6 +257,15 @@ public:
             if (checkLegal(i, who))
                 return i;
         return -1;
+    }
+
+    int genRandomMove(int who) {
+        vector<int> legalMove;
+        for (int i = 0; i < BOARDSIZE; ++i)
+            if (checkLegal(i, who))
+                legalMove.push_back(i);
+        shuffle(begin(legalMove), end(legalMove), rng);
+        return legalMove.front();
     }
 
     void clear() {

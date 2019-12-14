@@ -114,13 +114,10 @@ int main(int argc, char** argv) {
 //            tree.show_path();
             if (s != "reg_genmove") { // must play
 //              b.add(best_move, !b.just_play_color());
-                int move = b.genStupidMove(color);
+                int move = b.genRandomMove(color);
                 if (move >= 0) {
                     b.add(move, color);
-//                    b.showboard();
-//                    if (color == BLACK) cout << "Black's turn" << endl;
-//                    else if (color == WHITE) cout << "White's turn" << endl;
-//                    else cout << "Whose turn ?????" << endl;
+                    b.showboard();
                     cout << "=" << inttoGTPstring(move) << endl << endl;
                 } else {
                     cout << "=resign" << endl << endl;
