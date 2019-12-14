@@ -3,4 +3,4 @@ project(NoGo)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(NoGo main.cpp)
+add_executable(NoGo main.cpp bitboard.h board.h)

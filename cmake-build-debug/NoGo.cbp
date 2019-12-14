@@ -80,6 +80,12 @@
 				</MakeCommands>
 			</Target>
 		</Build>
+		<Unit filename="/Users/apple/Desktop/HW/TCG/TCG_Project_NoGo/NoGo/bitboard.h">
+			<Option target="NoGo"/>
+		</Unit>
+		<Unit filename="/Users/apple/Desktop/HW/TCG/TCG_Project_NoGo/NoGo/board.h">
+			<Option target="NoGo"/>
+		</Unit>
 		<Unit filename="/Users/apple/Desktop/HW/TCG/TCG_Project_NoGo/NoGo/main.cpp">
 			<Option target="NoGo"/>
 		</Unit>
