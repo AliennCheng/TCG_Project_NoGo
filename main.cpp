@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <ctime>
 #include "board.h"
+#include "MCTS.h"
 using namespace std;
 
 // transfer a GTP string to an integer indicating the board place
@@ -47,7 +48,7 @@ int main(int argc, char** argv) {
             cin >> who >> where;
             if(who[0]=='b' || who[0]=='B') color = BLACK;
             else color = WHITE;
-            b.add(GTPstringtoint(where), color);
+            b.add(GTPstringtoint(where));
             cout << "=" << endl << endl;
         }
         else if(s[0]=='e') // check empty
@@ -63,7 +64,6 @@ int main(int argc, char** argv) {
                                                  // reg_genmove: gen a move but dont play
         {
             bool finish = true;
-            int start, elapsed;
             string c;
             cin >> c;
             color = b.whoseTurn();
@@ -78,96 +78,29 @@ int main(int argc, char** argv) {
                 cout << "=resign" << endl << endl;
                 continue;
             }
-//            tree.reset(b);
-//            elapsed = clock();
-//            start = clock();
-//            int simulationFinishedCnt = 0;
-//            while(simulationFinishedCnt < simulationCnt)
-//            {
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                tree.run_a_cycle();
-//                simulationFinishedCnt +=10;
-//                e=clock();
-//                if(simulationFinishedCnt %10000==0)
-//                {
-//                    tree.show_path();
-//                }
-//            }
-//            k = tree.root -> getbestmove();
-//            ucbnode* tmp = tree.root -> childptr;
-//            int best_move = (tmp+k)->place;
-//            policy = tree.root->getPolicy();
-//            tree.root ->show_child();
-//            value = tree.root ->show_inf(k);
-//            cerr<<"simulation time : "<< (double)(e-st) / 1000.0<<endl;
-//            cerr<<"average deep : "<<(double)tree.total / (double)i<<endl;
-//            cerr<<"total node : "<< tree.totalnode<<endl;
-//            cerr<<"average speed : "<< (simulationFinishedCnt*1000) / (e-st) <<endl;
-//            tree.show_path();
+
+            MCTS mcts;
+            int action = mcts.runMCTS(&b);
+cout << endl << endl << "final choise: " << inttoGTPstring(action) << endl;
+//cout << "=resign" << endl << endl;
+//return 0;
+
             if (s != "reg_genmove") { // must play
-//              b.add(best_move, !b.just_play_color());
-                int move = b.genRandomMove(color);
+                // int move = b.getLegalMoves().front();
+                int move = action;
                 if (move >= 0) {
-                    b.add(move, color);
-                    b.showboard();
+                    b.add(move);
+                    //b.showboard();
                     cout << "=" << inttoGTPstring(move) << endl << endl;
                 } else {
                     cout << "=resign" << endl << endl;
                 }
             }
-//            if(value > 0.2)
-//            {
-//                cout<<"="<<inttoGTPstring(best_move)<<endl<<endl;
-//            }else
-//            {
-//                cout<<"=resign"<<endl<<endl;
-//            }
-
-//            tree.clear();
-
         }
-//        else if (s == "policy")
-//        {
-//            for (int i = 0; i < 9; i++)
-//            {
-//                for (int j = 0; j < 9; j++)
-//                {
-//                    cout << policy[i * 9 + j] << ' ';
-//                }
-//                cout << endl;
-//            }
-//        }
-//        else if (s == "value")
-//        {
-//            cout << value << endl;
-//        }
         else if (s == "protocol_version")
         {
             cout<<"= 2\n\n";
         }
-//        else if (s == "rev")
-//        {
-//            int bsize, wsize, tsize;
-//            int bone[BOARDSSIZE], wone[BOARDSSIZE], two[BOARDSSIZE];
-//            float x;
-//            cin >> x;
-//            float sum = 0;
-//            for (int i = 0; i < x; i++)
-//            {
-//                board tmpb = b;
-//                tmpb.getv(bone, wone, two, bsize, wsize, tsize);
-//                sum += tmpb.simulate(!tmpb.just_play_color(), bone, wone, two, bsize, wsize, tsize);
-//            }
-//            cout << sum / x << endl;
-//        }
         else if(s== "name")
         {
             cout << "=StupidNoGo\n\n";

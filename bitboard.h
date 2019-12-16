@@ -21,6 +21,11 @@ public:
         x[1] = 0LL;
     }
 
+    bitboard(const bitboard& other) {
+        x[0] = other.x[0];
+        x[1] = other.x[1];
+    }
+
     //void initLiberty(int i) { // liberty init
     bitboard(int i) { // liberty init
         x[0] = 0LL;

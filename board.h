@@ -35,12 +35,29 @@ public:
 //    void clear();
 
     board() {
+        rng = default_random_engine {};
         for (int i = 0; i < BOARDSIZE; i++) {
             //liberty[i].initLiberty(i);
             bitboard *tmp = new bitboard(i);
             libertyMap.insert(pair<int, bitboard*>(i, tmp));
-            rng = default_random_engine {};
         }
+    }
+
+    board(const board& other) {
+        rng = default_random_engine {};
+        bboard[BLACK] = bitboard(other.bboard[BLACK]);
+        bboard[WHITE] = bitboard(other.bboard[WHITE]);
+        ban[BLACK] = bitboard(other.ban[BLACK]);
+        ban[WHITE] = bitboard(other.ban[WHITE]);
+
+        // deep copy libertyMap
+        libertyMap.clear();
+        map<int, bitboard*>::const_iterator it = other.libertyMap.begin();
+        while(it != other.libertyMap.end()) {
+            libertyMap[it->first] = new bitboard(*(it->second));
+            ++it;
+        }
+
     }
 
     void deleteBoard() {
@@ -50,10 +67,13 @@ public:
         }
     }
 
-    void add(int where, bool who) {
+    void add(int where) {
+        bool who = whoseTurn();
+//cout << "adding " << where << " by " << who << endl;
         ban[BLACK].addB(where);
         ban[WHITE].addB(where);
         bboard[who].addB(where);
+//showboard();
 
         // update liberty
         if (where >= BOARDROW) { // not top row
@@ -216,7 +236,7 @@ public:
 
     void showboard() {
         cout << endl << "-----------------SHOW BOARD--------------" << endl;
-        cout << endl << "BOARD:" << endl ;
+        cout << "BOARD:" << endl ;
         for(int i = 0; i < BOARDSIZE; i++) {
             if(bboard[BLACK].get(i))
                 cout<<'@';
@@ -252,20 +272,28 @@ public:
         return (bboard[BLACK].isempty()) && (bboard[WHITE].isempty());
     }
 
-    int genStupidMove(int who) {
+    int genStupidMove(bool who) {
         for (int i = 0; i < BOARDSIZE; ++i)
             if (checkLegal(i, who))
                 return i;
         return -1;
     }
 
-    int genRandomMove(int who) {
-        vector<int> legalMove;
-        for (int i = 0; i < BOARDSIZE; ++i)
+    vector<int> getLegalMoves() {
+        bool who = whoseTurn();
+        vector<int> legalMoves;
+        for (int i = 0; i < BOARDSIZE; ++i) {
             if (checkLegal(i, who))
-                legalMove.push_back(i);
-        shuffle(begin(legalMove), end(legalMove), rng);
-        return legalMove.front();
+                legalMoves.push_back(i);
+        }
+        shuffle(begin(legalMoves), end(legalMoves), rng);
+        return legalMoves;
+    }
+
+    bool isTerminal() {
+        bool who = whoseTurn();
+        vector<int> legal = getLegalMoves();
+        return legal.size() == 0;
     }
 
     void clear() {

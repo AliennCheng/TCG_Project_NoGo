@@ -3,4 +3,4 @@ project(StupidNoGo)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(StupidNoGo main.cpp bitboard.h board.h)
+add_executable(StupidNoGo main.cpp bitboard.h board.h MCTS.h TreeNode.h)
