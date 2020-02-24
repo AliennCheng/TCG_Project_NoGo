@@ -3,31 +3,46 @@
 // Reference: https://github.com/memo/ofxMSAmcts/tree/master
 //
 
-#ifndef NOGO_MCTS_H
-#define NOGO_MCTS_H
+#ifndef MCTS_H
+#define MCTS_H
+
+#define BETA 0.5
 #include <ctime>
 #include "board.h"
 #include "TreeNode.h"
+#include "RAVE.h"
 
 class MCTS
 {
 private:
+//float QStarMax;
     int iterations;
     unsigned int maxIterations;
     unsigned int maxTime;
     struct timespec ts1, ts2;
     double time_elapsed;
     default_random_engine rng;
+    RAVE *rave;
 
 public:
 
-    MCTS() :iterations(0),
-            maxIterations(100000),
-            maxTime(1000),
-            time_elapsed(0)
+    MCTS() : iterations(0),
+             maxIterations(1000000),
+             time_elapsed(0)
     {
+        maxTime = 5000;
         rng = default_random_engine {};
+        rave = new RAVE();
 //cout << "MCTS created" << endl;
+    }
+
+    ~MCTS() {
+        delete rave;
+    }
+
+    void clear() {
+        delete rave;
+        rave = new RAVE();
     }
 
     double getTime() {
@@ -42,110 +57,139 @@ public:
     }
 
     // implement UCT here
-    TreeNode* getBestUCTChildren(TreeNode *parent) {
-        if(parent->getChildren().size() == 0) return NULL;
-
+    TreeNode* getBestChildren(TreeNode *parent) {
+// cout << endl << "--------------start---------------" << endl;
         vector<TreeNode*> vChildren(parent->getChildren());
-        shuffle(begin(vChildren), end(vChildren), rng);
-        return vChildren.front();
-    }
-
-    TreeNode* getMostVisitedChild(vector<TreeNode*> children) {
-        int maxVisits = -1;
-        TreeNode* maxChild = NULL;
-
-        for(int i = 0; i < children.size(); ++i) {
-            TreeNode* child = children[i];
-            if(child->getNumVisits() > maxVisits) {
-                maxVisits = child->getNumVisits();
-                maxChild = child;
+        if (vChildren.size() == 0) { cout << "empty children!!" << endl; exit(0); }
+        
+        float Qmax = -1, Q, Qtilde, Qstar;
+        TreeNode *best = nullptr;
+        for (int i = 0; i < vChildren.size(); ++i) {
+            Q = vChildren[i]->getUCT();
+            Qtilde = rave->getRaveWinrate(vChildren[i]->getAction());
+            Qstar = Q + (Qtilde/2);
+            if (Qstar > Qmax) {
+                Qmax = Qstar;
+                best = vChildren[i];
             }
+// cout << "action: " << vChildren[i]->getAction() << " Q:" << Q << " Qtilde:" << Qtilde << endl;
         }
-
-        return maxChild;
+// cout << endl << "MCTS best child: " << best->getAction() << endl;
+// cout << "----------------------------------" << endl;
+//QStarMax = Qmax;
+        return best;
     }
+
+    // TreeNode* getMostVisitedChild(TreeNode *parent) {
+    //     int maxVisits = -1;
+    //     TreeNode* maxChild = NULL;
+    //     vector<TreeNode*> children(parent->getChildren());
+
+    //     for(int i = 0; i < children.size(); ++i) {
+    //         TreeNode* child = children[i];
+    //         if(child->getNumVisits() > maxVisits) {
+    //             maxVisits = child->getNumVisits();
+    //             maxChild = child;
+    //         }
+    //     }
+
+    //     return maxChild;
+    // }
 
     int runMCTS(board *state) {
-//cout << endl << "------------MCTS START---------------" << endl << endl;
+// cout << endl << "------------MCTS START---------------" << endl << endl;
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts1);
 
-        TreeNode root(state);
-        TreeNode* bestNode = NULL;
-//cout << "root:" << endl;
-//root.getState().showboard();
+        TreeNode root(*state);
+        TreeNode* bestNode = nullptr;
+
+        TreeNode tmp(*state);
+        tmp.visiting();
+        if(!tmp.isFullyExpanded() && !tmp.isTerminal())
+            tmp.expand();
+        vector<TreeNode*> children = tmp.getChildren();
+        if (children.size() > 1) maxTime = 1000 * (children.size() - 1);
+        else maxTime = 1;
+        children.clear();
+        children.shrink_to_fit();
 
         while(true) {
+            ++iterations;
+            // rave->addIteration();
 
             // SELECT. Start at root; dig down into Tree.
-//cout << endl << "SELECT" << endl << endl;
+// cout << "SELECTING" << endl;
             TreeNode* node = &root;
+            node->visiting();
             while(!node->isTerminal() && node->isFullyExpanded()) {
-                node = getBestUCTChildren(node);
+                TreeNode* nodeTmp = getBestChildren(node);
+                if (!nodeTmp) break;
+                else node = nodeTmp;
+                node->visiting();
+                rave->raveVisiting(node->getAction());
             }
-//cout << "selected node:" << endl;
-//node->getState().showboard();
 
             // EXPAND by adding children (if not terminal or not fully expanded)
+// cout << "EXPANDING" << endl;
             if(!node->isFullyExpanded() && !node->isTerminal()) {
-//cout << endl << "EXPAND" << endl << endl;
                 node = node->expand();
-//cout << "expanded node:" << endl;
-//node->getState().showboard();
+                if (node == nullptr) continue;
+                node->visiting();
+                rave->raveVisiting(node->getAction());
             }
-            board state(node->getState());
+            board state = node->getState();
 
             // SIMULATE (if not terminal)
-//cout << endl << "SIMULATING---------------------------------------------------------------" << endl << endl;
+// cout << "SIMULATING" << endl;
             bool winner;
+            int counter = 81;
             if(!node->isTerminal()) {
-                board *b = new board(state);
-//b->showboard();
-                while(1) {
-                    if(b->isTerminal()) {
-                        winner = !(b->whoseTurn());
+                board b = state;
+                while(--counter > 0) {
+                    if(b.isTerminal()) {
+                        winner = !(b.whoseTurn());
+                        // b->clear();
+                        // b->deleteBoard();
+                        // delete b;
+                        // free(b);
                         break;
                     }
-                    b->add(b->getLegalMoves().front());
-//b->showboard();
+                    vector<int> legalMoves = b.getLegalMoves();
+                    b.add(legalMoves.front());
+                    legalMoves.clear();
+                    legalMoves.shrink_to_fit();
                 }
             }
-//cout << "END---------------------------------------------------------------" << endl;
-//cout << "simulate winner: " << (winner ? "BLACK" : "WHITE") << endl;
 
             // BACK PROPAGATION
-//cout << endl << "PROPAGATE" << endl << endl;
-            while(node) {
-                node->update(winner == node->getState().whoseTurn());
+// cout << "PROPAGATING" << endl;
+            if (node == nullptr) continue;
+            while(node && node->getAction() >= 0) {
+// cout << "win node: " << node->getAction() << endl;
+                board b = node->getState();
+                node->update(winner == b.whoseTurn(), rave);
                 node = node->getParent();
             }
 
             // find most visited child
             // best_node = get_most_visited_child(&root_node);
             // get highest winrate
-            vector<TreeNode*> children = root.getChildren();
-            float maxWinrate = -1;
-            for (int i = 0; i < children.size(); ++i) {
-//cout << "winrate of " << i << " is " << children[i]->getWinrate() << endl;
-                if (children[i]->getWinrate() > maxWinrate) {
-                    bestNode = children[i];
-                    maxWinrate = children[i]->getWinrate();
-                }
-            }
-//cout << "max winrate: " << maxWinrate << " by:" << bestNode->getAction() << endl;
-//bestNode->getState().showboard();
+            // bestNode = getMostVisitedChild(&root);
+// cout << "before bestNode" << endl;
+            bestNode = getBestChildren(&root);
+
+////////////////
+// cout << "best: " << bestNode->getAction() << " UCT: " << bestNode-> getUCT() << " Qtilde: " << rave->getRaveWinrate(bestNode->getAction()) << endl;
 
             // exit loop if current total run duration (since init) exceeds max_millis
             if(maxTime > 0 && getTime() > maxTime) {
-//cout << "return due to time" << endl;
                 break;
             }
 
             // exit loop if current iterations exceeds max_iterations
             if(maxIterations > 0 && iterations > maxIterations) {
-//cout << "return due to it" << endl;
                 break;
             }
-            iterations++;
         }
 
         // return best node's action
@@ -153,4 +197,4 @@ public:
     }
 };
 
-#endif //NOGO_MCTS_H
+#endif //MCTS_H

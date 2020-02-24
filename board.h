@@ -2,11 +2,12 @@
 // Created by Alienn Cheng on 2019/12/1.
 //
 
-#ifndef NOGO_BOARD_H
-#define NOGO_BOARD_H
+#ifndef BOARD_H
+#define BOARD_H
 #include "bitboard.h"
 #include <map>
 #include <random>
+#include <algorithm>
 #define BLACK 0
 #define WHITE 1
 using namespace std;
@@ -62,8 +63,8 @@ public:
 
     void deleteBoard() {
         for (int i = 0; i < BOARDSIZE; i++) {
-            if (libertyMap[i])
-                free(libertyMap[i]);
+            delete libertyMap[i];
+                // free(libertyMap[i]);
         }
     }
 
@@ -108,6 +109,9 @@ public:
             else
                 removeLiberty(where + 1, where);
         }
+
+        if (libertyMap[where]->count() == 1)
+            checkNotSafe(where);
     }
 
     void combineLiberty (int A, int B, bool who) {
@@ -116,13 +120,15 @@ public:
         libertyMap[A] -> minus(B);
         libertyMap[B] -> minus(A);
         (*libertyMap[A]) |= (*libertyMap[B]);
-        free(libertyMap[B]);
+        delete libertyMap[B];
+        // free(libertyMap[B]);
         for (int i = 0; i < block.size(); ++i) {
             libertyMap[block[i]] = libertyMap[A];
         }
 
-        if (libertyMap[A] -> count() == 1) {
+        if (libertyMap[A] -> count() <= 1) {
             int lastLib = libertyMap[A] -> getLastLiberty();
+            if (lastLib < 0) return;
             ban[!who].addB(lastLib); // ban capturing
             if (libertyMap[lastLib] -> count() == 0) { // ban suicide
                 banSuicide(lastLib);
@@ -137,9 +143,29 @@ public:
         libertyMap[where] -> minus(removal);
         // ban capturing
         if (libertyMap[where]->count() == 1) {
+            // ban suicide
+            int eye = libertyMap[where]->getLastLiberty();
+            if (libertyMap[eye]->count() == 0) {
+                bool notsafe = true;
+                if (eye >= BOARDROW && bboard[!who].get(eye - BOARDROW) &&
+                        libertyMap[eye - BOARDROW]->count() > 1)
+                    notsafe = false;
+                if (eye < BOARDSIZE - BOARDROW && bboard[!who].get(eye + BOARDROW) &&
+                        libertyMap[eye + BOARDROW]->count() > 1)
+                    notsafe = false;
+                if (eye % BOARDROW != 0 && bboard[!who].get(eye - 1) &&
+                        libertyMap[eye - 1]->count() > 1)
+                    notsafe = false;
+                if ((eye+1) % BOARDROW != 0 && bboard[!who].get(eye + 1) &&
+                        libertyMap[eye + 1]->count() > 1)
+                    notsafe = false;
+                if (notsafe) ban[!who].addB(eye);
+            }
+            // ban capturing
             int lastLib = libertyMap[where] -> getLastLiberty();
             ban[who].addB(lastLib);
         }
+        // ban suicide
         if (libertyMap[removal]->count() == 1) {
             int lastLib = libertyMap[removal] -> getLastLiberty();
             ban[!who].addB(lastLib);
@@ -155,58 +181,132 @@ public:
     }
 
     void banSuicide(int where) {
-        int blackNeighbor = 0, whiteNeighbor = 0;
-        bool blackSurvive = 0, whiteSurvive = 0;
+        if (libertyMap[where]->count() > 0) return;
+
+        bool safe = false;
+        // for BLACK
         if (where >= BOARDROW) { // not top row
-            if (bboard[BLACK].get(where - BOARDROW)) {
-                blackNeighbor += 1;
-                if (libertyMap[where - BOARDROW]->getLastLiberty() < 0)
-                    blackSurvive = 1;
-            } else if (bboard[WHITE].get(where - BOARDROW)) {
-                whiteNeighbor += 1;
-                if (libertyMap[where - BOARDROW]->getLastLiberty() < 0)
-                    whiteSurvive = 1;
-            }
+            if (bboard[BLACK].get(where - BOARDROW) && libertyMap[where - BOARDROW]->count() > 1)
+                safe = true;
         }
         if (where < BOARDSIZE - BOARDROW) {
-            if (bboard[BLACK].get(where + BOARDROW)) {
-                blackNeighbor += 1;
-                if (libertyMap[where + BOARDROW]->getLastLiberty() < 0)
-                    blackSurvive = 1;
-            } else if (bboard[WHITE].get(where + BOARDROW)) {
-                whiteNeighbor += 1;
-                if (libertyMap[where + BOARDROW]->getLastLiberty() < 0)
-                    whiteSurvive = 1;
-            }
+            if (bboard[BLACK].get(where + BOARDROW) && libertyMap[where + BOARDROW]->count() > 1)
+                safe = true;
         }
         if (where % BOARDROW != 0) {
-            if (bboard[BLACK].get(where - 1)) {
-                blackNeighbor += 1;
-                if (libertyMap[where - 1]->getLastLiberty() < 0)
-                    blackSurvive = 1;
-            } else if (bboard[WHITE].get(where - 1)) {
-                whiteNeighbor += 1;
-                if (libertyMap[where - 1]->getLastLiberty() < 0)
-                    whiteSurvive = 1;
-            }
+            if (bboard[BLACK].get(where - 1) && libertyMap[where - 1]->count() > 1)
+                safe = true;
         }
         if ((where+1) % BOARDROW != 0) {
-            if (bboard[BLACK].get(where + 1)) {
-                blackNeighbor += 1;
-                if (libertyMap[where + 1]->getLastLiberty() < 0)
-                    blackSurvive = 1;
-            } else if (bboard[WHITE].get(where + 1)) {
-                whiteNeighbor += 1;
-                if (libertyMap[where + 1]->getLastLiberty() < 0)
-                    whiteSurvive = 1;
-            }
+            if (bboard[BLACK].get(where + 1) && libertyMap[where + 1]->count() > 1)
+                safe = true;
         }
-        if (blackNeighbor == 4) { ban[WHITE].addB(where); }
-        if (whiteNeighbor == 4) { ban[BLACK].addB(where); }
-        if (blackSurvive == 0) { ban[BLACK].addB(where); }
-        if (whiteSurvive == 0) { ban[WHITE].addB(where); }
-        return;
+        if (!safe) ban[BLACK].addB(where);
+
+        safe = false;
+        if (where >= BOARDROW) { // not top row
+            if (bboard[WHITE].get(where - BOARDROW) && libertyMap[where - BOARDROW]->count() > 1)
+                safe = true;
+        }
+        if (where < BOARDSIZE - BOARDROW) {
+            if (bboard[WHITE].get(where + BOARDROW) && libertyMap[where + BOARDROW]->count() > 1)
+                safe = true;
+        }
+        if (where % BOARDROW != 0) {
+            if (bboard[WHITE].get(where - 1) && libertyMap[where - 1]->count() > 1)
+                safe = true;
+        }
+        if ((where+1) % BOARDROW != 0) {
+            if (bboard[WHITE].get(where + 1) && libertyMap[where + 1]->count() > 1)
+                safe = true;
+        }
+        if (!safe) ban[WHITE].addB(where);
     }
+
+    void checkNotSafe(int where) {
+        if (libertyMap[where]->count() != 1) return;
+
+        bool color;
+        if (bboard[BLACK].get(where)) color = BLACK;
+        else if (bboard[WHITE].get(where)) color = WHITE;
+        else return;
+
+        int lastLibWhere = -1;
+        if (where >= BOARDROW) { // not top row
+            if (!bboard[color].get(where - BOARDROW) && !bboard[!color].get(where - BOARDROW))
+                lastLibWhere = where - BOARDROW;
+            else if (!bboard[!color].get(where - BOARDROW)) return;
+        }
+        if (where < BOARDSIZE - BOARDROW) {
+            if (!bboard[color].get(where + BOARDROW) && !bboard[!color].get(where + BOARDROW))
+                lastLibWhere = where + BOARDROW;
+            else if (!bboard[!color].get(where + BOARDROW)) return;
+        }
+        if (where % BOARDROW != 0) {
+            if (!bboard[color].get(where - 1) && !bboard[!color].get(where - 1))
+                lastLibWhere = where - 1;
+            else if (!bboard[!color].get(where - 1)) return;
+        }
+        if ((where+1) % BOARDROW != 0) {
+            if (!bboard[color].get(where + 1) && !bboard[!color].get(where + 1))
+                lastLibWhere = where + 1;
+            else if (!bboard[!color].get(where + 1)) return;
+        }
+        ban[!color].addB(lastLibWhere);
+    }
+    // void banSuicide(int where) {
+    //     int blackNeighbor = 0, whiteNeighbor = 0;
+    //     bool blackSurvive = 0, whiteSurvive = 0;
+    //     if (where >= BOARDROW) { // not top row
+    //         if (bboard[BLACK].get(where - BOARDROW)) {
+    //             blackNeighbor += 1;
+    //             if (libertyMap[where - BOARDROW]->getLastLiberty() < 0)
+    //                 blackSurvive = 1;
+    //         } else if (bboard[WHITE].get(where - BOARDROW)) {
+    //             whiteNeighbor += 1;
+    //             if (libertyMap[where - BOARDROW]->getLastLiberty() < 0)
+    //                 whiteSurvive = 1;
+    //         } else return;
+    //     }
+    //     if (where < BOARDSIZE - BOARDROW) {
+    //         if (bboard[BLACK].get(where + BOARDROW)) {
+    //             blackNeighbor += 1;
+    //             if (libertyMap[where + BOARDROW]->getLastLiberty() < 0)
+    //                 blackSurvive = 1;
+    //         } else if (bboard[WHITE].get(where + BOARDROW)) {
+    //             whiteNeighbor += 1;
+    //             if (libertyMap[where + BOARDROW]->getLastLiberty() < 0)
+    //                 whiteSurvive = 1;
+    //         } else return;
+    //     }
+    //     if (where % BOARDROW != 0) {
+    //         if (bboard[BLACK].get(where - 1)) {
+    //             blackNeighbor += 1;
+    //             if (libertyMap[where - 1]->getLastLiberty() < 0)
+    //                 blackSurvive = 1;
+    //         } else if (bboard[WHITE].get(where - 1)) {
+    //             whiteNeighbor += 1;
+    //             if (libertyMap[where - 1]->getLastLiberty() < 0)
+    //                 whiteSurvive = 1;
+    //         } else return;
+    //     }
+    //     if ((where+1) % BOARDROW != 0) {
+    //         if (bboard[BLACK].get(where + 1)) {
+    //             blackNeighbor += 1;
+    //             if (libertyMap[where + 1]->getLastLiberty() < 0)
+    //                 blackSurvive = 1;
+    //         } else if (bboard[WHITE].get(where + 1)) {
+    //             whiteNeighbor += 1;
+    //             if (libertyMap[where + 1]->getLastLiberty() < 0)
+    //                 whiteSurvive = 1;
+    //         } else return;
+    //     }
+    //     if (blackNeighbor == 4) { ban[WHITE].addB(where); }
+    //     if (whiteNeighbor == 4) { ban[BLACK].addB(where); }
+    //     if (blackSurvive == 0) { ban[BLACK].addB(where); }
+    //     if (whiteSurvive == 0) { ban[WHITE].addB(where); }
+    //     return;
+    // }
 
     bool whoseTurn() {
         int b = bboard[BLACK].count();
@@ -286,14 +386,21 @@ public:
             if (checkLegal(i, who))
                 legalMoves.push_back(i);
         }
-        shuffle(begin(legalMoves), end(legalMoves), rng);
+        if (legalMoves.size() > 1) shuffle(begin(legalMoves), end(legalMoves), rng);
         return legalMoves;
     }
 
     bool isTerminal() {
-        bool who = whoseTurn();
         vector<int> legal = getLegalMoves();
-        return legal.size() == 0;
+        if (legal.size() == 0) {
+            legal.clear();
+            legal.shrink_to_fit();
+            return true;
+        } else {
+            legal.clear();
+            legal.shrink_to_fit();
+            return false;
+        }
     }
 
     void clear() {
@@ -301,12 +408,103 @@ public:
         bboard[1].clear();
         ban[0].clear();
         ban[1].clear();
+// cout << "clearing" << endl;
+        for (int i = 0; i < libertyMap.size(); ++i) {
+            if (libertyMap[i] != nullptr) {
+                vector<int> vec = getBlock(i);
+                delete libertyMap[i];
+                for (int j : vec) libertyMap[j] = nullptr;
+                vec.clear();
+                vec.shrink_to_fit();
+            }
+        }
+// cout << "end of clear" << endl;
         libertyMap.clear();
         for (int i = 0; i < BOARDSIZE; i++) {
             bitboard *tmp = new bitboard(i);
             libertyMap.insert(pair<int, bitboard*>(i, tmp));
         }
     }
+
+    int heuristicPlay(bool color) {
+        for (int i = 0; i < BOARDSIZE; ++i) {
+            // if there's an intersection with only 1 liberty is surrounded by the opponent,
+            // occupy it to take advantage of "no taking"
+            // if there's an intersection with only 1 liberty is surrounded by myself,
+            // occupy its last liberty to take advantage of "no suicide"
+            if (libertyMap[i]->count() == 1) {
+                if (bboard[BLACK].get(i) || bboard[WHITE].get(i)) continue;
+
+                int opp = 0, me = 0, action = -1;
+                if (i >= BOARDROW) { // not top
+                    if (bboard[color].get(i - BOARDROW)) { ++me; }
+                    else if (bboard[!color].get(i - BOARDROW)) { ++opp; }
+                    else { action = i - BOARDROW; }
+                }
+                if (i < BOARDSIZE - BOARDROW) { // not bottom
+                    if (bboard[color].get(i + BOARDROW)) { ++me; }
+                    else if (bboard[!color].get(i + BOARDROW)) { ++opp; }
+                    else { action = i + BOARDROW; }
+                }
+                if (i % BOARDROW != 0) { // not left
+                    if (bboard[color].get(i - 1)) { ++me; }
+                    else if (bboard[!color].get(i - 1)) { ++opp; }
+                    else { action = i - 1; }
+                }
+                if ((i+1) % BOARDROW != 0) { // not right
+                    if (bboard[color].get(i + 1)) { ++me; }
+                    else if (bboard[!color].get(i + 1)) { ++opp; }
+                    else { action = i + 1; }
+                }
+
+                if (opp > 0 && me == 0) {
+                    if (checkLegal(i, color)) return i;
+                    else continue;
+                } else if (opp == 0 && me > 0) {
+                    if (checkLegal(action, color)) return action;
+                    else continue;
+                }
+                continue;
+            }
+        }
+
+        for (int i = 0; i < BOARDSIZE; ++i) {
+            if (libertyMap[i]->count() == 2) {
+                int counter = 0, action = -1;
+                if (bboard[BLACK].get(i) || bboard[WHITE].get(i)) continue;
+
+                if (i >= BOARDROW) { // not top
+                    if (bboard[color].get(i - BOARDROW)) ++counter;
+                    else if (bboard[!color].get(i - BOARDROW)) continue;
+                    else action = i - BOARDROW;
+                } else { ++counter; }
+
+                if (i < BOARDSIZE - BOARDROW) { // not bottom
+                    if (bboard[color].get(i + BOARDROW)) ++counter;
+                    else if (bboard[!color].get(i + BOARDROW)) continue;
+                    else action = i + BOARDROW;
+                } else { ++counter; }
+
+                if (i % BOARDROW != 0) { // not left
+                    if (bboard[color].get(i - 1)) ++counter;
+                    else if (bboard[!color].get(i - 1)) continue;
+                    else action = i - 1;
+                } else { ++counter; }
+
+                if ((i+1) % BOARDROW != 0) { // not right
+                    if (bboard[color].get(i + 1)) ++counter;
+                    else if (bboard[!color].get(i + 1)) continue;
+                    else action = i + 1;
+                } else { ++counter; }
+
+                if (counter == 2) {
+                    if (checkLegal(action, color)) return action;
+                    else continue;
+                }
+            }
+        }
+        return -1;
+    }
 };
 
-#endif //NOGO_BOARD_H
+#endif //BOARD_H

@@ -3,8 +3,8 @@
 // A board has 81 intersections which can be represented by 2 64-bit bitboard.
 //
 
-#ifndef NOGO_BITBOARD_H
-#define NOGO_BITBOARD_H
+#ifndef BITBOARD_H
+#define BITBOARD_H
 #define BOARDCOL 9
 #define BOARDROW 9
 #define BOARDSIZE 81
@@ -128,4 +128,4 @@ public:
     }
 };
 
-#endif //NOGO_BITBOARD_H
+#endif //BITBOARD_H
